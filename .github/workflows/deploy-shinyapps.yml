@@ -26,31 +26,36 @@ jobs:
     - uses: r-lib/actions/setup-r-dependencies@v2
       with:
         packages: |
-          any::shiny
-          any::shinythemes
-          any::tidyverse
-          any::readxl
-          any::maps
-          any::sf
-          any::rvest
-          any::leaflet
-          any::plotly
-          any::rsconnect
-          any::cpp11
-          any::progress
+          shiny
+          shinythemes
+          tidyverse
+          readxl
+          maps
+          sf
+          rvest
+          leaflet
+          plotly
+          rsconnect
+          cpp11
+          progress
 
     - name: Smoke test (live AESO scrape + map render)
       run: Rscript tests/smoke_test.R
 
-    # P3M binaries record "Repository: RSPM" in DESCRIPTION, which rsconnect can pass
-    # through to the manifest as Source=RSPM; shinyapps.io then fails with
-    # "Unsupported url scheme: RSPM/src/contrib/...". Packages tagged CRAN always
-    # resolve to Source=CRAN, so retag them (they are CRAN packages).
+    # rsconnect copies install metadata into the manifest, and shinyapps.io only
+    # understands Source=CRAN for these packages:
+    # - P3M binaries record "Repository: RSPM" -> Source=RSPM
+    #   ("Unsupported url scheme: RSPM/src/contrib/...")
+    # - pak "any::pkg" refs record "RemoteType: any" -> Source=any
+    # Retag both as plain CRAN installs (which they are).
     - name: Tag installed packages as CRAN
       run: |
         Rscript -e 'cat(.libPaths(), sep = "\n")' | while read -r lib; do
-          grep -l '^Repository: RSPM$' "$lib"/*/DESCRIPTION 2>/dev/null \
-            | xargs -r sed -i 's/^Repository: RSPM$/Repository: CRAN/'
+          grep -l -E '^(Repository: RSPM|RemoteType: any)$' "$lib"/*/DESCRIPTION 2>/dev/null \
+            | xargs -r sed -i -E \
+                -e 's/^Repository: RSPM$/Repository: CRAN/' \
+                -e 's/^RemoteType: any$/RemoteType: standard/' \
+                -e 's/^(RemotePkgRef|RemoteRef): any::/\1: /'
         done
 
     - name: Check manifest sources
