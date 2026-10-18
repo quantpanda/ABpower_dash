@@ -14,3 +14,8 @@ Link to the app: https://ohaley.shinyapps.io/ab_power/
 Olivier Haley, Connor Beebe, Luke Talman & Brooklyn Holt
 
 
+
+### Deployment
+- Every push to `main` runs `.github/workflows/deploy-shinyapps.yml`: it runs `tests/smoke_test.R` against live AESO data, then deploys to shinyapps.io. It can also be run by hand from the Actions tab ("Run workflow").
+- Requires repository secrets `SHINYAPPS_TOKEN` and `SHINYAPPS_SECRET` (shinyapps.io → Account → Tokens).
+- Run the smoke test locally with `Rscript tests/smoke_test.R`.
