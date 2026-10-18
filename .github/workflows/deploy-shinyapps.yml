@@ -48,10 +48,10 @@ jobs:
         SHINYAPPS_SECRET: ${{ secrets.SHINYAPPS_SECRET }}
       run: |
         Rscript -e '
-          # packages were installed as Linux binaries from repo "RSPM"; give shinyapps.io
-          # source-repo URLs for that name so it can build them on its own image
-          options(repos = c(RSPM = "https://packagemanager.posit.co/cran/latest",
-                            CRAN = "https://cloud.r-project.org"))
+          # P3M binaries record "Repository: RSPM"; if a repo named RSPM is configured,
+          # rsconnect writes Source=RSPM to the manifest, which shinyapps.io cannot
+          # fetch from. With CRAN as the only repo, packages resolve to Source=CRAN.
+          options(repos = c(CRAN = "https://cloud.r-project.org"))
           rsconnect::setAccountInfo(name = "ohaley",
                                     token = Sys.getenv("SHINYAPPS_TOKEN"),
                                     secret = Sys.getenv("SHINYAPPS_SECRET"))
