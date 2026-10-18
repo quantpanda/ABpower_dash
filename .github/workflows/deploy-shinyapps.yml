@@ -84,7 +84,7 @@ jobs:
             appName = "ab_power",
             appId = 11258662,
             appFiles = c("global.R", "server.R", "ui.R",
-                         "CSD Generation (Hourly) - 2024-01 2.csv",
+                         "data/asset_planning_area.csv",
                          list.files("AESO-Planning-Areas-2020-06-23", full.names = TRUE)),
             forceUpdate = TRUE,
             launch.browser = FALSE
