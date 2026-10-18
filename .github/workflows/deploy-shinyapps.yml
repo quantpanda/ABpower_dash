@@ -42,15 +42,35 @@ jobs:
     - name: Smoke test (live AESO scrape + map render)
       run: Rscript tests/smoke_test.R
 
+    # P3M binaries record "Repository: RSPM" in DESCRIPTION, which rsconnect can pass
+    # through to the manifest as Source=RSPM; shinyapps.io then fails with
+    # "Unsupported url scheme: RSPM/src/contrib/...". Packages tagged CRAN always
+    # resolve to Source=CRAN, so retag them (they are CRAN packages).
+    - name: Tag installed packages as CRAN
+      run: |
+        Rscript -e 'cat(.libPaths(), sep = "\n")' | while read -r lib; do
+          grep -l '^Repository: RSPM$' "$lib"/*/DESCRIPTION 2>/dev/null \
+            | xargs -r sed -i 's/^Repository: RSPM$/Repository: CRAN/'
+        done
+
+    - name: Check manifest sources
+      run: |
+        Rscript -e '
+          options(repos = c(CRAN = "https://cloud.r-project.org"))
+          rsconnect::writeManifest(appFiles = c("global.R", "server.R", "ui.R"), quiet = TRUE)
+          pkgs <- jsonlite::read_json("manifest.json")$packages
+          unlink("manifest.json")
+          src <- vapply(pkgs, function(p) if (is.null(p$Source)) NA_character_ else p$Source, "")
+          bad <- src[is.na(src) | src != "CRAN"]
+          if (length(bad)) stop("Non-CRAN sources in manifest: ", paste(names(bad), bad, sep = "=", collapse = ", "))
+          message("All ", length(src), " packages resolve to Source=CRAN")'
+
     - name: Deploy
       env:
         SHINYAPPS_TOKEN: ${{ secrets.SHINYAPPS_TOKEN }}
         SHINYAPPS_SECRET: ${{ secrets.SHINYAPPS_SECRET }}
       run: |
         Rscript -e '
-          # P3M binaries record "Repository: RSPM"; if a repo named RSPM is configured,
-          # rsconnect writes Source=RSPM to the manifest, which shinyapps.io cannot
-          # fetch from. With CRAN as the only repo, packages resolve to Source=CRAN.
           options(repos = c(CRAN = "https://cloud.r-project.org"))
           rsconnect::setAccountInfo(name = "ohaley",
                                     token = Sys.getenv("SHINYAPPS_TOKEN"),
