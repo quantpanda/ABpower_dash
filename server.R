@@ -27,48 +27,50 @@ function(input, output, session) {
                   data <- reactiveGenerationBySource()
                   
                   if (input$typeInput != "All") {
-                    if(input$gasInput != "All"){
-                      data <- data %>%
-                      dplyr::filter(subtype == input$gasInput)
-                    } else {
                     data <- data %>%
                       dplyr::filter(type == input$typeInput)
-                      }
+                    # gasInput keeps its value while hidden, so only apply it to GAS
+                    if (input$typeInput == "GAS" && input$gasInput != "All") {
+                      data <- data %>%
+                        dplyr::filter(subtype == input$gasInput)
                     }
-                  
+                  }
+
                   result <- data %>%
-                    dplyr::group_by(Area_ID) %>% 
-                    dplyr::summarise(MC_sum = sum(MC), TNG_sum = sum(TNG), date = date[1]) %>% 
-                    dplyr::mutate(cap_prop = round(TNG_sum / MC_sum * 100), 1) %>%
-                    dplyr::right_join(boundaries, by = "Area_ID") %>% 
-                    tidyr::replace_na(list(MC_sum = 0, TNG_sum = 0, cap_prop = 0, date = data$date[1]))
+                    dplyr::group_by(Area_ID) %>%
+                    dplyr::summarise(MC_sum = sum(MC), TNG_sum = sum(TNG), date = date[1]) %>%
+                    dplyr::right_join(boundaries, by = "Area_ID") %>%
+                    tidyr::replace_na(list(MC_sum = 0, TNG_sum = 0, date = data$date[1])) %>%
+                    # utilization is undefined (NA) where an area has no capacity
+                    dplyr::mutate(cap_prop = dplyr::if_else(MC_sum > 0, round(TNG_sum / MC_sum * 100, 1), NA_real_))
                   result
                 })
+
+  output$currentDate <- shiny::renderText({
+    paste("Last Update: ", format(reactiveGenerationBySource()$date[1], "%b %d, %Y %H:%M %Z"))
+  })
   
   # Render the filtered map
   output$alberta_map <- leaflet::renderLeaflet({
     # get the filtered data
-    map_data <- filteredData() %>% 
-      dplyr::arrange(desc(Area_ID))
-    output$currentDate <- shiny::renderText({
-      paste("Last Update: ", map_data$date[1])
-    })
+    map_data <- filteredData()
+    # align rows with the polygon order of boundaries
+    map_data <- map_data[match(boundaries$Area_ID, map_data$Area_ID), ]
     # get user input for desired output
     var_x <- map_data[[input$colInput]]
-    range_max <- max(var_x, na.rm = TRUE)
-    # if range_max is zero, add a small increment to ensure uniqueness in breaks
-    ifelse(range_max == 0, range_max <- 1, 0)
-    # create dynamic bins
-    dynamic_bins <- round(c(0, seq(10, range_max, length.out = 7)), digits = 0)
-    # color palette
-    pal <- leaflet::colorBin(c("YlOrRd"), domain = var_x, bins = dynamic_bins)
-    
+    # floor of 1 keeps the breaks unique when every area is zero or NA
+    range_max <- max(c(var_x, 1), na.rm = TRUE)
+    # pretty() always returns unique, increasing breaks that cover range_max
+    dynamic_bins <- pretty(c(0, range_max), n = 6)
+    # color palette; grey for areas with no capacity (NA utilization)
+    pal <- leaflet::colorBin(c("YlOrRd"), domain = var_x, bins = dynamic_bins, na.color = "#bdbdbd")
+
     labss <- lapply(1:nrow(map_data), function(i) {
+      util <- if (is.na(map_data$cap_prop[i])) "n/a (no capacity)" else paste0(map_data$cap_prop[i], "%")
       shiny::HTML(paste("Area: ", map_data$NAME[i], "<br>",
-                 "Output: ", var_x[i], "MW", "<br>",
                  "Maximum Capacity: ", map_data$MC_sum[i], "MW", "<br>",
                  "Current Output: ", map_data$TNG_sum[i], "MW", "<br>",
-                 "Current Utilization Rate: ", map_data$cap_prop[i], "%"))
+                 "Current Utilization Rate: ", util))
       }
     )
     
@@ -86,7 +88,11 @@ function(input, output, session) {
                              weight = 5,
                              color = "#000",
                              bringToFront = TRUE)) %>% 
-      leaflet::addLegend(pal = pal, values = var_x, title = "Output in MW")
+      leaflet::addLegend(pal = pal, values = var_x,
+                         title = c(MC_sum = "Maximum Capacity (MW)",
+                                   TNG_sum = "Current Output (MW)",
+                                   cap_prop = "Utilization (%)")[[input$colInput]],
+                         na.label = "No capacity")
     }
   )
 }
