@@ -83,5 +83,5 @@ Desktop.ini
 myenv/
 lib/
 
-# Planning-area mapping used by the app (must stay tracked)
-!CSD Generation (Hourly) - 2024-01 2.csv
+# Asset -> planning area lookup used by the app (must stay tracked)
+!data/asset_planning_area.csv

@@ -16,11 +16,9 @@ boundaries <- sf::st_as_sf(boundaries_1, coords = c("long", "lat"), crs = "+proj
   dplyr::arrange(desc(Area_ID))
 
 
-# gen file with comprehensive area-asset mapping 
-genFile <- read_csv("CSD Generation (Hourly) - 2024-01 2.csv") %>% 
-  dplyr::transmute(assetID = `Asset Short Name`, Area_ID = `Planning Area`, region = Region) %>% 
-  dplyr::group_by(assetID) %>% 
-  dplyr::slice(1)
+# asset -> planning area lookup; rebuild with data-raw/build_asset_lookup.R
+genFile <- read_csv("data/asset_planning_area.csv", show_col_types = FALSE) %>%
+  dplyr::select(assetID, Area_ID, region)
 
 # Scrape function
 scrapeGen <- function(aesoDashSource ){

@@ -25,7 +25,13 @@ testServer(server, {
 })
 
 unmapped <- dplyr::filter(generationBySource, is.na(Area_ID))
-message(sprintf("Unmapped assets: %d (%.0f MW capacity not shown on map)", nrow(unmapped), sum(unmapped$MC)))
+if (nrow(unmapped) > 0) {
+  # ::warning:: shows as an annotation on the GitHub Actions run; it does not fail the job
+  cat(sprintf("::warning::%d assets (%.0f MW) have no planning area and are missing from the map: %s. Update data/asset_planning_area.csv (see data-raw/build_asset_lookup.R).\n",
+              nrow(unmapped), sum(unmapped$MC), paste(unmapped$assetID, collapse = ", ")))
+} else {
+  message("All ", nrow(generationBySource), " assets mapped to a planning area")
+}
 
 if (length(failures) > 0) stop("Map failed to render:\n", paste(failures, collapse = "\n"))
 message("Smoke test passed: ", nrow(generationBySource), " assets, ",
